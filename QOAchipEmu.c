@@ -49,8 +49,6 @@ static void cdc_task(void);
 
 static struct qoaInstance inst;
 
-static int16_t outputBuf[2048];
-
 /*------------- MAIN -------------*/
 int main(void) {
 	stdio_init_all();
@@ -65,28 +63,6 @@ int main(void) {
 		tud_task(); // tinyusb device task
 		cdc_task();
 	}
-}
-
-void sendSamples(int count) {
-	static size_t bufReadPos = 0;
-
-	int byteCount = count * 2;
-	// Check if request is larger than buffer
-	if (count > 2048) {
-		return;
-	}
-	
-	// Read from the buffer and send, with logic for "circular" buffering
-	if (bufReadPos + count > 2047) {
-		// No loops needed because requesting more than 2048 samples (i.e. looping twice or more) will return garbage data
-		int difference = 2047 - bufReadPos;
-		tud_cdc_write(&outputBuf[bufReadPos], difference * 2);
-		bufReadPos = 0;
-		tud_cdc_write(&outputBuf[bufReadPos], (count - difference) * 2);
-	} else {
-		tud_cdc_write(&outputBuf[bufReadPos], byteCount);
-	}
-	tud_cdc_write_flush();
 }
 
 // Invoked when device is mounted, but we dont have to do anything
@@ -104,63 +80,59 @@ void tud_umount_cb(void) {
 // USB CDC
 //--------------------------------------------------------------------+
 static void cdc_task(void) {
-	static int bufWritePos = 0;
 
 	if (tud_cdc_available()) {
+		
 		uint8_t buf[8];
 
 		uint32_t count = tud_cdc_read(buf, 8);
-		uint32_t data;
-		int index;
+		if(count) {
+			
+			uint32_t data = 0;
+			int index = 0;
 
-		// Decode type of msg at the start
-		uint8_t msg = buf[0] & 0x0F;
-		switch (msg) {
-		case 0x01: // Samples to decode
-			// Convert the buffer to samples for decoding and shift to get rid of the message
-			uint64_t slice = *(uint64_t*)(buf) >> 4;
+			// Decode type of msg at the start
+			uint8_t msg = buf[0] & 0x0F;
+			switch (msg) {
+			case 0x01: // Samples to decode
+				// Convert the buffer to samples for decoding and shift to get rid of the message
+				int16_t outputBuf[20];
+				uint64_t slice;
+				memcpy(&slice, buf, sizeof(uint64_t));
+				slice >>= 4;
 
-			// Circular buffer logic
-			if(bufWritePos + 20 > 2047) {
-				int difference = 2047 - bufWritePos;
-				decodeSamples(inst, slice, difference, &outputBuf[bufWritePos]);
-				bufWritePos = 0;
-				decodeSamples(inst, slice, 20 - difference, &outputBuf[bufWritePos]);
-				bufWritePos += 20 - difference;
-			} else {
-				decodeSamples(inst, slice, 20, &outputBuf[bufWritePos]);
-				bufWritePos += 20;
+				decodeSamples(&inst, slice, outputBuf);
+				tud_cdc_write(outputBuf, 40);
+	
+				tud_cdc_write_flush();
+				break;
+
+			case 0x08: // History value fill
+				memcpy(&data, buf, sizeof(uint32_t));
+				data >>= 4;
+				//Get index
+				printf("%i\n", data >> 2);
+				index = data & 0x03;
+				inst.history[index] = (int16_t)(data >> 2);
+				break;
+
+			case 0x07: // Weights value fill
+				memcpy(&data, buf, sizeof(uint32_t));
+				data >>= 4;
+				//Get index
+				index = data & 0x03;
+				inst.weights[index] = (int16_t)(data >> 2);
+				break;
+
+			case 0x04: // sf_quant data
+				memcpy(&data, buf, sizeof(uint32_t));
+				data >>= 4;
+				inst.sf_quant = (int8_t)(data) & 0x0F;
+				break;
+
+			default:
+				break;
 			}
-
-			break;
-
-		case 0x08: // History value fill
-			data = (uint32_t)(buf) >> 4;
-			//Get index
-			index = data & 0x03;
-			inst.history[index] = (int16_t)(data >> 2);
-			break;
-		
-		case 0x07: // Weights value fill
-			data = (uint32_t)(buf) >> 4;
-			//Get index
-			index = data & 0x03;
-			inst.weights[index] = (int16_t)(data >> 2);
-			break;
-
-		case 0x04: // sf_quant data
-			data = (uint32_t)(buf) >> 4;
-			inst.sf_quant = (int8_t)(data);
-			break;
-
-		case 0x03: // send back samples
-			data = (uint32_t)(buf) >> 4;
-			int count = (int)(data);
-
-			break;
-
-		default:
-			break;
 		}
 	}
 }

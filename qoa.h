@@ -45,21 +45,21 @@ static inline int qoa_clamp_s16(int v) {
 	return v;
 }
 
-void decodeSamples(struct qoaInstance inst, uint64_t slice, int count, int16_t output[]) {
+void decodeSamples(struct qoaInstance *inst, uint64_t slice, int16_t output[]) {
 
 	// Decode all requested samples from a slice
-	for (size_t i = 0; i < count; i++) {
+	for (size_t i = 0; i < 20; i++) {
 
 		// Predict sample from history and weights
 		int p = 0;
 		for (size_t n = 0; n < 4; n++) {
-			p += inst.history[n] * inst.weights[n];
+			p += inst->history[n] * inst->weights[n];
 		}
 		p >>= 13;
 
 		// Get and decode quantized residual
 		uint qr = (slice >> (i * 3)) & 0x07;
-		int dequantized = qoa_dequant_tab[inst.sf_quant][qr];
+		int dequantized = qoa_dequant_tab[inst->sf_quant][qr];
 
 		// Add new value at proper spot in output (reverse order because QOA is big endian)
 		output[i] = qoa_clamp_s16(dequantized + p);
@@ -67,11 +67,11 @@ void decodeSamples(struct qoaInstance inst, uint64_t slice, int count, int16_t o
 		// Update history and weights
 		int delta = dequantized >> 4;
     	for (size_t n = 0; n < 4; n++) {
-        	inst.weights[n] += (inst.history[n] < 0) ? -delta : delta;
+        	inst->weights[n] += (inst->history[n] < 0) ? -delta : delta;
 		}
 		for (size_t n = 0; n < 3; n++)
-        	inst.history[n] = inst.history[n+1];
-    	inst.history[3] = output[i];
+        	inst->history[n] = inst->history[n+1];
+    	inst->history[3] = output[i];
 	}
 	
 	return;
