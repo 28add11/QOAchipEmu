@@ -2,6 +2,7 @@
 A Raspberry Pi Pico program designed to emulate the functionality and USB interface of [tt07_qoa_decode](https://github.com/28add11/tt07_qoa_decode)
 
 This is intended to make developing the PC side of software for the real device much easier when it comes in late December!
+It connects to a PC using USB, and then decodes audio samples.
 
 ![An image showing a terminal displaying information about samples and the time it took to complete those samples](https://cloud-1p09spafi-hack-club-bot.vercel.app/0image.png)
 
