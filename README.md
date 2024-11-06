@@ -3,6 +3,8 @@ A Raspberry Pi Pico program designed to emulate the functionality and USB interf
 
 This is intended to make developing the PC side of software for the real device much easier when it comes in late December!
 
+![An image showing a terminal displaying information about samples and the time it took to complete those samples](https://cloud-1p09spafi-hack-club-bot.vercel.app/0image.png)
+
 ## Details
 The chip this is meant to emulate is my ASIC for decoding [the QOA audio format](https://qoaformat.org/), which takes the audio as samples and all the data required to decode thoes, and accelerates it in hardware. This "emulator" is primarily meant to test the USB interface, with the decoding software being very simple.
 
