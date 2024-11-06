@@ -80,12 +80,13 @@ void tud_umount_cb(void) {
 // USB CDC
 //--------------------------------------------------------------------+
 static void cdc_task(void) {
+	static int roundRobinWriteInd = 0;
 
-	if (tud_cdc_available()) {
+	if (tud_cdc_n_available(0)) {
 		
 		uint8_t buf[8];
 
-		uint32_t count = tud_cdc_read(buf, 8);
+		uint32_t count = tud_cdc_n_read(0, buf, 8);
 		if(count) {
 			
 			uint32_t data = 0;
@@ -102,9 +103,12 @@ static void cdc_task(void) {
 				slice >>= 4;
 
 				decodeSamples(&inst, slice, outputBuf);
-				tud_cdc_write(outputBuf, 40);
+				tud_cdc_n_write(roundRobinWriteInd, outputBuf, 40);
 	
-				tud_cdc_write_flush();
+				tud_cdc_n_write_flush(roundRobinWriteInd);
+
+				// XOR makes it flip between 0 and 1!
+				roundRobinWriteInd ^= 1;
 				break;
 
 			case 0x08: // History value fill
