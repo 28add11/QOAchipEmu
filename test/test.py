@@ -2,6 +2,7 @@ import serial
 import serial.tools.list_ports
 
 import time
+import os
 
 def to_signed_16_bit(n):
     """Convert an unsigned 16-bit integer to a signed 16-bit integer."""
@@ -15,18 +16,27 @@ serSend.baudrate = 115200
 serSend.timeout = 10.0
 serSend.write_timeout = 10.0
 
+serRecive = serial.Serial()
+serRecive.baudrate = 115200
+serRecive.timeout = 10.0
+serRecive.write_timeout = 10.0
+
 print("Ports availible:")
 ports_avail = serial.tools.list_ports.comports()
 for i in ports_avail:
 	print(i.device)
 
-port = input("Please select a port from that list to send data to: ")
+port = input("Please select a port from that list to send and recive data: ")
 serSend.port = port
 
+port = input("Please select a port from that list to recive data: ")
+serRecive.port = port
+
 serSend.open()
+serRecive.open()
 
 print("Reading test data...")
-with open("test/qoaTestF SMALL.txt", "r") as debugDat:
+with open("test/qoaTestF.txt", "r") as debugDat:
 	fileDat = debugDat.readlines()
 
 sampleCount = 0
@@ -39,6 +49,7 @@ prevSfQuant = 256
 # We send samples in blocks of 20 so this is for that
 slicedSample = 0
 slice = 0x00000001
+RoundRobinRecive = 0 # Alliteration
 
 prevtime = time.time()
 
@@ -75,10 +86,15 @@ for line in fileDat:
 				slice = 0x0000000000000001
 				slicedSample = 0
 
-				# Get samples back
+				# Get samples back, round robin is for bandwidth
 				instruction = 0x00000003
 				serSend.write(instruction.to_bytes(1, "little"))
-				returnedSampleBuf = serSend.read(40)
+				if RoundRobinRecive:
+					returnedSampleBuf = serRecive.read(40)
+					RoundRobinRecive = 0
+				else:
+					returnedSampleBuf = serSend.read(40)
+					RoundRobinRecive = 1
 				# Process all returned samples
 				for n in range(0, 20):
 					returnedSample = to_signed_16_bit(returnedSampleBuf[0 + (2 * n)] | (returnedSampleBuf[1 + (2 * n)] << 8))
@@ -93,3 +109,4 @@ for line in fileDat:
 			sampleCount += 1
 
 serSend.close()
+serRecive.close()
