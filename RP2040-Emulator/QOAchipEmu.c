@@ -59,6 +59,7 @@ int main(void) {
 		board_init_after_tusb();
 	}
 
+
 	while (1) {
 		tud_task(); // tinyusb device task
 		cdc_task();
@@ -89,6 +90,7 @@ static void cdc_task(void) {
 		uint32_t count = tud_cdc_n_read(0, buf, 8);
 		if(count) {
 			
+			
 			uint32_t data = 0;
 			int index = 0;
 
@@ -96,6 +98,7 @@ static void cdc_task(void) {
 			uint8_t msg = buf[0] & 0x0F;
 			switch (msg) {
 			case 0x01: // Samples to decode
+				gpio_put(PICO_DEFAULT_LED_PIN, 1);
 				// Convert the buffer to samples for decoding and shift to get rid of the message
 				int16_t outputBuf[20];
 				uint64_t slice;
@@ -137,6 +140,7 @@ static void cdc_task(void) {
 			default:
 				break;
 			}
+
 		}
 	}
 }

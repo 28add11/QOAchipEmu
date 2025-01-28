@@ -12,12 +12,12 @@ def to_signed_16_bit(n):
         return n
 
 serSend = serial.Serial()
-serSend.baudrate = 115200
+serSend.baudrate = 4000000
 serSend.timeout = 10.0
 serSend.write_timeout = 10.0
 
 serRecive = serial.Serial()
-serRecive.baudrate = 115200
+serRecive.baudrate = 4000000
 serRecive.timeout = 10.0
 serRecive.write_timeout = 10.0
 
@@ -36,7 +36,7 @@ serSend.open()
 serRecive.open()
 
 print("Reading test data...")
-with open("test/qoaTestF.txt", "r") as debugDat:
+with open("qoaTestF.txt", "r") as debugDat:
 	fileDat = debugDat.readlines()
 
 sampleCount = 0
@@ -60,6 +60,8 @@ for line in fileDat:
 
 			# Send instruction
 			serSend.write(instruction.to_bytes(4, "little"))
+			if sampleCount < 100:
+				print("Sent instruction " + str(bin(instruction)))
 
 		else: # Sample
 			splitted = line.split()
@@ -73,6 +75,8 @@ for line in fileDat:
 				# Send instruction
 				serSend.write(instruction.to_bytes(4, "little"))
 				prevSfQuant = sfQuant
+				if sampleCount < 100:
+					print("Sent instruction " + str(bin(instruction)))
 
 			# Store sample and add to next instruction
 			expectedSamples.append(sample)
@@ -86,9 +90,12 @@ for line in fileDat:
 				slice = 0x0000000000000001
 				slicedSample = 0
 
+				if sampleCount < 100:
+					print("Sent instruction " + str(bin(instruction)))
+
 				# Get samples back, round robin is for bandwidth
-				instruction = 0x00000003
-				serSend.write(instruction.to_bytes(1, "little"))
+				#instruction = 0x00000003
+				#serSend.write(instruction.to_bytes(1, "little"))
 				if RoundRobinRecive:
 					returnedSampleBuf = serRecive.read(40)
 					RoundRobinRecive = 0
@@ -103,8 +110,8 @@ for line in fileDat:
 						print("Sample " + str(sampleCount - (20 - n)) + " with value " + str(returnedSample) + " is not equal to " + str(expected))
 						assert False
 
-			if sampleCount % 1000 == 0 and sampleCount != 0:
-				print("Completed sample " + str(sampleCount) + "\tSamples per second: " + str(1000 / (time.time() - prevtime)))
+			if sampleCount % 50000 == 0 and sampleCount != 0:
+				print("Completed sample " + str(sampleCount) + "\tSamples per second: " + str(50000 / (time.time() - prevtime)))
 				prevtime = time.time()
 			sampleCount += 1
 
