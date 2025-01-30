@@ -1,12 +1,24 @@
+import gc
+GCThreshold = gc.threshold()
+gc.threshold(80000)
+
+import ttboard.log as logging
+
+logging.basicConfig(level=logging.DEBUG, filename='boot.log')
+
 from machine import Pin, SoftSPI
 from ttboard.mode import RPMode
 from ttboard.demoboard import DemoBoard
 
+gc.collect()
+
 # get a handle to the board
 tt = DemoBoard()
 
+gc.threshold(GCThreshold)
+
 # enable a specific project, e.g.
-tt.shuttle.tt07_qoa_decode.enable()
+tt.shuttle.tt_um_28add11_QOAdecode.enable()
 
 print(f'Project {tt.shuttle.enabled.name} running')
 
@@ -70,35 +82,7 @@ w 3 15212
 7 2 2333
 8 1 2304
 8 2 3509
-8 0 4758
-8 0 5221
-8 1 4441
-8 1 3073
-8 2 3348
-8 6 7449
-8 2 12237
-8 5 12412
-8 3 8886
-8 3 5225
-8 3 3421
-8 2 4937
-8 2 8307
-8 1 9878
-8 3 8000
-8 1 5012
-8 1 3317
-8 0 3894
-8 6 8197
-8 0 12113
-8 2 14070
-8 7 11374
-8 1 7703
-8 3 5538
-8 3 4714
-8 5 2896
-8 1 746
-8 6 2576
-8 6 8465"""
+8 0 4758"""
 
 fileDat = fullFile.split("\n")
 
