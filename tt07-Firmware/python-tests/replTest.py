@@ -13,49 +13,58 @@ from ttboard.demoboard import DemoBoard
 
 logging.dumpTicksMsDelta('import')
 
-gc.collect()
+def to_signed_16_bit(n):
+    """Convert an unsigned 16-bit integer to a signed 16-bit integer."""
+    if n >= 0x8000:  # If the number is greater than or equal to 32768
+        return n - 0x10000  # Subtract 65536
+    else:
+        return n
 
-# get a handle to the board
-tt = DemoBoard()
+def run():
 
-gc.threshold(GCThreshold)
+	gc.collect()
 
-# enable a specific project, e.g.
-#tt.shuttle.tt_um_28add11_QOAdecode.enable()
-logging.dumpTicksMsDelta('enable')
+	# get a handle to the board
+	tt = DemoBoard.get()
 
-sleep(0.01)
+	gc.threshold(GCThreshold)
 
-print(f'Project {tt.shuttle.enabled.name} running')
-print("Resetting project...")
+	# enable a specific project, e.g.
+	#tt.shuttle.tt_um_28add11_QOAdecode.enable()
+	logging.dumpTicksMsDelta('enable')
 
-# reset
-for i in range(10):
-	tt.clock_project_once()
+	sleep(0.01)
 
-tt.reset_project(True)
-tt.clock_project_stop()
-sleep(0.01)
-for i in range(10):
-	tt.clock_project_once()
-tt.reset_project(False)
-logging.dumpTicksMsDelta('reset')
+	print(f'Project {tt.shuttle.enabled.name} running')
+	print("Resetting project...")
 
-sleep(0.01)
-# start automatic project clocking
-tt.clock_project_PWM(10000)
+	# reset
+	for i in range(10):
+		tt.clock_project_once()
 
-print("Driving io...")
-cs = Pin(21, mode=Pin.OUT)
-cs.value(1)
-logging.dumpTicksMsDelta('io')
+	tt.reset_project(True)
+	tt.clock_project_stop()
+	sleep(0.01)
+	for i in range(10):
+		tt.clock_project_once()
+	tt.reset_project(False)
+	logging.dumpTicksMsDelta('reset')
 
-print("initializing spi...")
-spi = SoftSPI(baudrate=100, polarity=0, phase=0, sck=tt.pins.uio3.raw_pin, mosi=tt.pins.uio1.raw_pin, miso=tt.pins.uio2.raw_pin)
-print(f"SPI: {spi}\tSCK: {tt.pins.uio3.raw_pin}\tMOSI: {tt.pins.uio1.raw_pin}\tMISO: {tt.pins.uio2.raw_pin}")
+	sleep(0.01)
+	# start automatic project clocking
+	tt.clock_project_PWM(10000)
 
-# Start testing the project
-fullFile = """h 0 -186
+	print("Driving io...")
+	cs = Pin(21, mode=Pin.OUT)
+	cs.value(1)
+	logging.dumpTicksMsDelta('io')
+
+	print("initializing spi...")
+	spi = SoftSPI(baudrate=100, polarity=0, phase=0, sck=tt.pins.uio3.raw_pin, mosi=tt.pins.uio1.raw_pin, miso=tt.pins.uio2.raw_pin)
+	print(f"SPI: {spi}\tSCK: {tt.pins.uio3.raw_pin}\tMOSI: {tt.pins.uio1.raw_pin}\tMISO: {tt.pins.uio2.raw_pin}")
+
+	# Start testing the project
+	fullFile = """h 0 -186
 w 0 -844
 h 1 5417
 w 1 6376
@@ -107,59 +116,52 @@ w 3 15212
 8 2 3509
 8 0 4758"""
 
-fileDat = fullFile.split("\n")
+	fileDat = fullFile.split("\n")
 
-def to_signed_16_bit(n):
-    """Convert an unsigned 16-bit integer to a signed 16-bit integer."""
-    if n >= 0x8000:  # If the number is greater than or equal to 32768
-        return n - 0x10000  # Subtract 65536
-    else:
-        return n
+	for line in fileDat:
+			print("line: ", line)
+			# Determine operation
+			if line[0] == 'h' or line[0] == 'w': # Fill history or weights
+				instruction = (((int(line[2]) & 0x03) << 2) | (int(line[0] == 'w') << 1)) & 0x3E
+				print("instruction: ", instruction)
+				data = int(line[4:])
 
-for line in fileDat:
-		print("line: ", line)
-		# Determine operation
-		if line[0] == 'h' or line[0] == 'w': # Fill history or weights
-			instruction = (((int(line[2]) & 0x03) << 2) | (int(line[0] == 'w') << 1)) & 0x3E
-			print("instruction: ", instruction)
-			data = int(line[4:])
+				# Send instruction
+				cs.value(0)
+				spi.write(instruction.to_bytes(1, "big"))
 
-			# Send instruction
-			cs.value(0)
-			spi.write(instruction.to_bytes(1, "big"))
+				# Send data
+				databytes = data.to_bytes(2, "big")
+				spi.write(databytes)
+				cs.value(1)
 
-			# Send data
-			databytes = data.to_bytes(2, "big")
-			spi.write(databytes)
-			cs.value(1)
+			else: # Sample
+				splitted = line.split()
+				sfQuant = int(splitted[0])
+				qr = int(splitted[1])
+				sample = int(splitted[2])
 
-		else: # Sample
-			splitted = line.split()
-			sfQuant = int(splitted[0])
-			qr = int(splitted[1])
-			sample = int(splitted[2])
+				# Send sample
+				instruction = ((sfQuant << 4) | (qr << 1)) | 0x01
+				print("instruction: ", instruction)
+				cs.value(0)
+				spi.write(instruction.to_bytes(1, "big"))
+				cs.value(1)
+				sleep(0.1) # Delay for processing
 
-			# Send sample
-			instruction = ((sfQuant << 4) | (qr << 1)) | 0x01
-			print("instruction: ", instruction)
-			cs.value(0)
-			spi.write(instruction.to_bytes(1, "big"))
-			cs.value(1)
-			sleep(0.1) # Delay for processing
+				# Get sample
+				instruction = 0x80
+				# Send instruction
+				cs.value(0)
+				spi.write(instruction.to_bytes(1, "big"))
+				cs.value(1)
+				sleep(0.1)
+				cs.value(0)
+				# Recive
+				returned = 0
+				returned = int.from_bytes(spi.read(1))
+				returned = int.from_bytes(spi.read(1)) | (returned << 8)
+				cs.value(1)
 
-			# Get sample
-			instruction = 0x80
-			# Send instruction
-			cs.value(0)
-			spi.write(instruction.to_bytes(1, "big"))
-			cs.value(1)
-			sleep(0.1)
-			cs.value(0)
-			# Recive
-			returned = 0
-			returned = int.from_bytes(spi.read(1))
-			returned = int.from_bytes(spi.read(1)) | (returned << 8)
-			cs.value(1)
-			
-			print(f"Returned: {to_signed_16_bit(returned)}\tSample: {sample}")
-			assert to_signed_16_bit(returned) == sample
+				print(f"Returned: {to_signed_16_bit(returned)}\tSample: {sample}")
+				assert to_signed_16_bit(returned) == sample

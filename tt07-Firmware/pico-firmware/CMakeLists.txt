@@ -35,18 +35,20 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(rp2040-firmware rp2040-firmware.c )
+add_executable(rp2040-firmware rp2040-firmware.c tt_setup.c)
 
 pico_set_program_name(rp2040-firmware "rp2040-firmware")
 pico_set_program_version(rp2040-firmware "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(rp2040-firmware 1)
-pico_enable_stdio_usb(rp2040-firmware 0)
+pico_enable_stdio_uart(rp2040-firmware 0)
+pico_enable_stdio_usb(rp2040-firmware 1)
 
 # Add the standard library to the build
 target_link_libraries(rp2040-firmware
-        pico_stdlib)
+        pico_stdlib
+    	hardware_gpio
+		hardware_pwm)
 
 # Add the standard include files to the build
 target_include_directories(rp2040-firmware PRIVATE

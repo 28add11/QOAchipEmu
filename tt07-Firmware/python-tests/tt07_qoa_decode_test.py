@@ -78,8 +78,8 @@ w 3 15212
 
 	fileDat = fullFile.split("\n")
 
-	# Set the clock period to 20 ns (50 MHz)
-	clock = Clock(dut.clk, 20, units="ns")
+	# Set the clock period to 1000 ns (1 MHz)
+	clock = Clock(dut.clk, 1000, units="ns")
 	cocotb.start_soon(clock.start())
 
 	# Reset
@@ -101,7 +101,7 @@ w 3 15212
 	dut.uio_in.value = 0b00000001
 	await ClockCycles(dut.clk, 3)
 
-	# pull everything low
+	# pull chipselect (and everything else) low
 	dut.uio_in.value = 0
 	await ClockCycles(dut.clk, 3)
 
@@ -116,18 +116,18 @@ w 3 15212
 			# Send instruction
 			for bit in range(0, 8):
 				await ClockCycles(dut.clk, 3)
-				baseInst = (((instruction << bit) & 0x80) >> 6)
-				dut.uio_in.value = baseInst
+				dataBit = (((instruction << bit) & 0x80) >> 6)
+				dut.uio_in.value = dataBit
 				await ClockCycles(dut.clk, 3)
-				dut.uio_in.value = 0x08 | baseInst
+				dut.uio_in.value = 0x08 | dataBit
 			
 			# Send data
 			for bit in range(0, 16):
 				await ClockCycles(dut.clk, 3)
-				baseInst = (((data << bit) & 0x8000) >> 14)
-				dut.uio_in.value = baseInst
+				dataBit = (((data << bit) & 0x8000) >> 14)
+				dut.uio_in.value = dataBit
 				await ClockCycles(dut.clk, 3)
-				dut.uio_in.value = 0x08 | baseInst
+				dut.uio_in.value = 0x08 | dataBit
 			
 			# Wait 3 clocks and zero values
 			await ClockCycles(dut.clk, 3)
@@ -144,10 +144,10 @@ w 3 15212
 			instruction = ((sfQuant << 4) | (qr << 1)) | 0x01
 			for bit in range(0, 8):
 				await ClockCycles(dut.clk, 3)
-				baseInst = (((instruction << bit) & 0x80) >> 6)
-				dut.uio_in.value = baseInst
+				dataBit = (((instruction << bit) & 0x80) >> 6)
+				dut.uio_in.value = dataBit
 				await ClockCycles(dut.clk, 3)
-				dut.uio_in.value = 0x08 | baseInst
+				dut.uio_in.value = 0x08 | dataBit
 
 			await ClockCycles(dut.clk, 3)
 			dut.uio_in.value = 0x0
@@ -158,10 +158,10 @@ w 3 15212
 			instruction = 0x80
 			# Send instruction
 			for bit in range(0, 8):
-				baseInst = (((instruction << bit) & 0x80) >> 6)
-				dut.uio_in.value = baseInst
+				dataBit = (((instruction << bit) & 0x80) >> 6)
+				dut.uio_in.value = dataBit
 				await ClockCycles(dut.clk, 3)
-				dut.uio_in.value = 0x08 | baseInst
+				dut.uio_in.value = 0x08 | dataBit
 				await ClockCycles(dut.clk, 3)
 				
 			# Recive
