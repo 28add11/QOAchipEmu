@@ -52,4 +52,4 @@ char *testData[] = {"h 0 -186",
 "8 2 3509",
 "8 0 4758"};
 
-#define TESTCOUNT sizeof(testData)/sizeof(char *)
+#define TESTCOUNT 50

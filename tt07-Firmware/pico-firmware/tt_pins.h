@@ -1,6 +1,7 @@
 #pragma once
 
 #include "hardware/gpio.h"
+#include "pico/stdlib.h"
 
 // Mapping for PGA2350-TT06 with broken TT05 carrier converter
 enum GPIOMap {
