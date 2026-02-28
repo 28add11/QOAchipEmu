@@ -47,11 +47,10 @@
 #include "bsp/board_api.h"
 #include "tusb.h"
 
-#include "spi.pio.h"
-#include "pio-spi.h"
+#include "bitbangSPI.h"
 
 // Clock defines
-#define CLK_HZ 10000000
+#define CLK_HZ 2000000
 #define CLK_PERIOD_US ((1.0/CLK_HZ)*1000000) // Seconds to microseconds conversion
 
 
@@ -69,76 +68,58 @@ void clkProjectNTimes(int n) {
 	pwm_set_enabled(slice_num, true);
 }
 
-void sendHist(int index, int16_t data, const pio_spi_inst_t *spi) {
+void sendHist(int index, int16_t data) {
 	uint8_t instruction = index << 2; // History banksel is zero, thus the whole instruction is just the index << 2
 
 	// Send it!
-	gpio_put(PIN_CS, 0);
-	pio_spi_write8_blocking(spi, &instruction, 1);
+	spiWrite(instruction);
 
 	// Data portion
 	uint8_t dataLow = data & 0xFF;
 	uint8_t dataHigh = (data >> 8) & 0xFF;
-	pio_spi_write8_blocking(spi, &dataHigh, 1);
-	pio_spi_write8_blocking(spi, &dataLow, 1);
-	sleep_us(1);
-	gpio_put(PIN_CS, 1);
+	spiWrite(dataHigh);
+	spiWrite(dataLow);
 }
 
-void sendWeights(int index, int16_t data, const pio_spi_inst_t *spi) {
+void sendWeights(int index, int16_t data) {
 	uint8_t instruction = (index << 2) | 0x2; 
 
 	// Send it!
-	gpio_put(PIN_CS, 0);
-	pio_spi_write8_blocking(spi, &instruction, 1);
+	spiWrite(instruction);
 
 	// Data portion
 	uint8_t dataLow = data & 0xFF;
 	uint8_t dataHigh = (data >> 8) & 0xFF;
-	pio_spi_write8_blocking(spi, &dataHigh, 1);
-	pio_spi_write8_blocking(spi, &dataLow, 1);
-	sleep_us(1);
-	gpio_put(PIN_CS, 1);
+	spiWrite(dataHigh);
+	spiWrite(dataLow);
 }
 
-int16_t transmitSample(int sf_quant, int qr, const pio_spi_inst_t *spi) {
+int16_t transmitSample(int sf_quant, int qr) {
 
 	uint8_t instruction = (sf_quant << 4) | (qr << 1) | 0x01;
 
 	// Send
-	gpio_put(PIN_CS, 0);
-	pio_spi_write8_blocking(spi, &instruction, 1);
-	sleep_us(1);
-	gpio_put(PIN_CS, 1);
+	spiWrite(instruction);
 
 	// Wait adiquate number of clock cycles
-	sleep_us(CLK_PERIOD_US * 40);
+	sleep_us(CLK_PERIOD_US * 45);
 
 	// Request data return
 	instruction = 0x80;
-	gpio_put(PIN_CS, 0);
-	pio_spi_write8_blocking(spi, &instruction, 1);
+	spiWrite(instruction);
 
 	// read the data back
 	int16_t returnedSample;
 	uint8_t returnedByte;
-	pio_spi_read8_blocking(spi, &returnedByte, 1);
+	returnedByte = spiRead();
 	returnedSample = returnedByte << 8;
-	pio_spi_read8_blocking(spi, &returnedByte, 1);
+	returnedByte = spiRead();
 	returnedSample = returnedSample | returnedByte;
-	sleep_us(1);
-	gpio_put(PIN_CS, 1);
 
 	return returnedSample;
 }
 
 static void cdc_task(void);
-
-pio_spi_inst_t spi = {
-        .pio = pio0,
-        .sm = 0,
-        .cs_pin = PIN_CS
-};
 
 /*------------- MAIN -------------*/
 int main(void) {
@@ -159,26 +140,11 @@ int main(void) {
 
 	printf("Testing project...\n");
 
-    // Initialize pins for our spi
+    // Initialize pins for our bit banged spi
     gpio_set_function(PIN_MISO, GPIO_FUNC_SIO);
     gpio_set_function(PIN_CS,   GPIO_FUNC_SIO);
     gpio_set_function(PIN_SCK,  GPIO_FUNC_SIO);
     gpio_set_function(PIN_MOSI, GPIO_FUNC_SIO);
-
-
-
-	uint offset = pio_add_program(spi.pio, &spi_cpha0_program);
-    printf("Loaded program at %d\n", offset);
-
-    pio_spi_init(spi.pio, spi.sm, offset,
-                 8,       // 8 bits per SPI frame
-                 125000000/(float)(SPI_CLK_FREQ * 4),  // gets clock division
-                 false,   // CPHA = 0
-                 false,   // CPOL = 0
-                 PIN_SCK,
-                 PIN_MOSI,
-                 PIN_MISO
-    );
 	
 	gpio_put(PIN_CS, 1);
 
@@ -250,7 +216,7 @@ static void cdc_task(void) {
 
 				for (int i = 0; i < 20; i++) {
 					int qr = (slice >> (i * 3)) & 0x07;
-					outputBuf[i] = transmitSample(sf_quant, qr, &spi);
+					outputBuf[i] = transmitSample(sf_quant, qr);
 				}
 				
 				tud_cdc_n_write(roundRobinWriteInd, outputBuf, 40);
@@ -270,7 +236,7 @@ static void cdc_task(void) {
 				int16_t hist = data >> 2;
 				
 				// Send it!
-				sendHist(index, hist, &spi);
+				sendHist(index, hist);
 				break;
 
 			case 0x07: // Weights value fill
@@ -282,7 +248,7 @@ static void cdc_task(void) {
 				int16_t weight = data >> 2;
 				
 				// Send it!
-				sendWeights(index, weight, &spi);
+				sendWeights(index, weight);
 				break;
 
 			case 0x04: // sf_quant data
